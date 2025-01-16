@@ -1,6 +1,78 @@
 # Changelog
 
+This file contains individual changes for the OpenTelemetry.Shims.OpenTracing
+package. For highlights and announcements covering all components see: [Release
+Notes](../../RELEASENOTES.md).
+
 ## Unreleased
+
+## 1.11.0-beta.1
+
+Released 2025-Jan-16
+
+* Updated OpenTelemetry core component version(s) to `1.11.0`.
+  ([#6064](https://github.com/open-telemetry/opentelemetry-dotnet/pull/6064))
+
+## 1.10.0-beta.1
+
+Released 2024-Nov-12
+
+* Fixed an issue causing all tag values added via the `ISpanBuilder` API to be
+  converted to strings on the `ISpan` started from the builder.
+  ([#5797](https://github.com/open-telemetry/opentelemetry-dotnet/pull/5797))
+
+* Updated OpenTelemetry core component version(s) to `1.10.0`.
+  ([#5970](https://github.com/open-telemetry/opentelemetry-dotnet/pull/5970))
+
+## 1.9.0-beta.2
+
+Released 2024-Jun-24
+
+## 1.9.0-beta.1
+
+Released 2024-Jun-14
+
+## 1.9.0-alpha.2
+
+Released 2024-May-29
+
+## 1.9.0-alpha.1
+
+Released 2024-May-20
+
+## 1.7.0-beta.1
+
+Released 2023-Dec-08
+
+* Remove obsolete `TracerShim(Tracer, TextMapPropagator)` constructor.
+  Use `TracerShim(TracerProvider)`
+  or `TracerShim(TracerProvider, TextMapPropagator)` constructors.
+  ([#4862](https://github.com/open-telemetry/opentelemetry-dotnet/pull/4862))
+
+## 1.6.0-beta.1
+
+Released 2023-Sep-05
+
+* Fix: Do not raise `ArgumentException` if `Activity` behind the shim span
+  has an invalid context.
+  ([#2787](https://github.com/open-telemetry/opentelemetry-dotnet/issues/2787))
+
+* Obsolete `TracerShim(Tracer, TextMapPropagator)` constructor.
+  Provide `TracerShim(TracerProvider)`
+  and `TracerShim(TracerProvider, TextMapPropagator)` constructors.
+  ([#4812](https://github.com/open-telemetry/opentelemetry-dotnet/pull/4812))
+
+## 1.5.0-beta.1
+
+Released 2023-Jun-05
+
+* Bumped the package version to `1.5.0-beta.1` to keep its major and minor
+  version in sync with that of the core packages. This would make it more
+  intuitive for users to figure out what version of core packages would work
+  with a given version of this package. The pre-release identifier has also been
+  changed from `rc` to `beta` as we believe this more accurately reflects the
+  status of this package. We believe the `rc` identifier will be more
+  appropriate as semantic conventions reach stability.
 
 ## 1.0.0-rc9.14
 

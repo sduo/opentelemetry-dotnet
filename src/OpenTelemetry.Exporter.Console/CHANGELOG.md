@@ -1,6 +1,159 @@
 # Changelog
 
+This file contains individual changes for the OpenTelemetry.Exporter.Console
+package. For highlights and announcements covering all components see: [Release
+Notes](../../RELEASENOTES.md).
+
 ## Unreleased
+
+## 1.11.0
+
+Released 2025-Jan-15
+
+## 1.11.0-rc.1
+
+Released 2024-Dec-11
+
+## 1.10.0
+
+Released 2024-Nov-12
+
+## 1.10.0-rc.1
+
+Released 2024-Nov-01
+
+* Added direct reference to `System.Text.Json` for the `net8.0` target with
+  minimum version of `8.0.5` in response to
+  [CVE-2024-30105](https://github.com/advisories/GHSA-hh2w-p6rv-4g7w) &
+  [CVE-2024-43485](https://msrc.microsoft.com/update-guide/vulnerability/CVE-2024-43485).
+  ([#5874](https://github.com/open-telemetry/opentelemetry-dotnet/pull/5874),
+  [#5891](https://github.com/open-telemetry/opentelemetry-dotnet/pull/5891))
+
+* Added support for Instrumentation Scope Attributes (i.e
+  [ActivitySource.Tags](https://learn.microsoft.com/dotnet/api/system.diagnostics.activitysource.tags))
+  when writing traces to the console.
+  ([#5935](https://github.com/open-telemetry/opentelemetry-dotnet/pull/5935))
+
+## 1.10.0-beta.1
+
+Released 2024-Sep-30
+
+## 1.9.0
+
+Released 2024-Jun-14
+
+## 1.9.0-rc.1
+
+Released 2024-Jun-07
+
+* The experimental APIs previously covered by `OTEL1000`
+  (`LoggerProviderBuilder.AddConsoleExporter` extension) are now part of the
+  public API and supported in stable builds.
+  ([#5648](https://github.com/open-telemetry/opentelemetry-dotnet/pull/5648))
+
+## 1.9.0-alpha.1
+
+Released 2024-May-20
+
+## 1.8.1
+
+Released 2024-Apr-17
+
+## 1.8.0
+
+Released 2024-Apr-02
+
+* Added support for `ActivitySource.Version` property.
+  ([#5472](https://github.com/open-telemetry/opentelemetry-dotnet/pull/5472))
+
+## 1.8.0-rc.1
+
+Released 2024-Mar-27
+
+## 1.8.0-beta.1
+
+Released 2024-Mar-14
+
+## 1.7.0
+
+Released 2023-Dec-08
+
+## 1.7.0-rc.1
+
+Released 2023-Nov-29
+
+* Added support for Instrumentation Scope Attributes (i.e
+  [Meter.Tags](https://learn.microsoft.com/dotnet/api/system.diagnostics.metrics.meter.tags)),
+  when writing metrics to the console, fixing issue
+  [#4563](https://github.com/open-telemetry/opentelemetry-dotnet/issues/4563).
+  ([#5089](https://github.com/open-telemetry/opentelemetry-dotnet/pull/5089))
+
+## 1.7.0-alpha.1
+
+Released 2023-Oct-16
+
+## 1.6.0
+
+Released 2023-Sep-05
+
+## 1.6.0-rc.1
+
+Released 2023-Aug-21
+
+## 1.6.0-alpha.1
+
+Released 2023-Jul-12
+
+* **Experimental (pre-release builds only):**
+
+  * Note: See
+    [#4735](https://github.com/open-telemetry/opentelemetry-dotnet/pull/4735)
+    for the introduction of experimental api support.
+
+  * Add back support for Exemplars. See
+    [exemplars](../../docs/metrics/customizing-the-sdk/README.md#exemplars) for
+    instructions to enable exemplars.
+    ([#4553](https://github.com/open-telemetry/opentelemetry-dotnet/pull/4553))
+
+  * Updated to display `Severity` and `SeverityText` text instead of
+    `ILogger.LogLevel` when exporting `LogRecord` instances.
+    ([#4568](https://github.com/open-telemetry/opentelemetry-dotnet/pull/4568))
+
+  * Added `LoggerProviderBuilder.AddConsoleExporter` registration extension.
+    ([#4583](https://github.com/open-telemetry/opentelemetry-dotnet/pull/4583))
+
+## 1.5.1
+
+Released 2023-Jun-26
+
+## 1.5.0
+
+Released 2023-Jun-05
+
+* Remove support for exporting `Exemplars`. This would be added back in the
+  `1.6.*` prerelease versions right after `1.5.0` stable version is released.
+  ([#4533](https://github.com/open-telemetry/opentelemetry-dotnet/pull/4533))
+
+## 1.5.0-rc.1
+
+Released 2023-May-25
+
+* Add display of bucket boundaries when using exponential histograms.
+  ([#4507](https://github.com/open-telemetry/opentelemetry-dotnet/pull/4507))
+
+* Added direct reference to `System.Text.Encodings.Web` with minimum version of
+  `4.7.2` in response to
+  [CVE-2021-26701](https://github.com/dotnet/runtime/issues/49377).
+  ([#4390](https://github.com/open-telemetry/opentelemetry-dotnet/pull/4390))
+
+* Updated `LogRecord` console output: `Body` is now shown (if set),
+  `StateValues` are now written as `Attributes`, and `State` is no longer
+  processed.
+  ([#4334](https://github.com/open-telemetry/opentelemetry-dotnet/pull/4334))
+
+## 1.5.0-alpha.2
+
+Released 2023-Mar-31
 
 ## 1.5.0-alpha.1
 

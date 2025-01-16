@@ -1,22 +1,11 @@
-// <copyright file="OpenTelemetryServicesExtensionsTests.cs" company="OpenTelemetry Authors">
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// </copyright>
+// SPDX-License-Identifier: Apache-2.0
 
+using System.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 using Xunit;
@@ -35,9 +24,9 @@ public class OpenTelemetryServicesExtensionsTests
 
         var host = builder.Build();
 
-        await host.StartAsync().ConfigureAwait(false);
+        await host.StartAsync();
 
-        await host.StopAsync().ConfigureAwait(false);
+        await host.StopAsync();
     }
 
     [Fact]
@@ -73,9 +62,9 @@ public class OpenTelemetryServicesExtensionsTests
 
         var host = builder.Build();
 
-        await Assert.ThrowsAsync<NotSupportedException>(() => host.StartAsync()).ConfigureAwait(false);
+        await Assert.ThrowsAsync<NotSupportedException>(() => host.StartAsync());
 
-        await host.StopAsync().ConfigureAwait(false);
+        await host.StopAsync();
 
         Assert.True(expectedInnerExceptionThrown);
     }
@@ -140,7 +129,7 @@ public class OpenTelemetryServicesExtensionsTests
         var builder = new HostBuilder()
             .ConfigureAppConfiguration(builder =>
             {
-                builder.AddInMemoryCollection(new Dictionary<string, string>
+                builder.AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     ["TEST_KEY"] = "TEST_KEY_VALUE",
                 });
@@ -158,7 +147,7 @@ public class OpenTelemetryServicesExtensionsTests
 
                                 var configuration = sp.GetRequiredService<IConfiguration>();
 
-                                var testKeyValue = configuration.GetValue<string>("TEST_KEY", null);
+                                var testKeyValue = configuration.GetValue<string?>("TEST_KEY", null);
 
                                 Assert.Equal("TEST_KEY_VALUE", testKeyValue);
                             });
@@ -170,11 +159,11 @@ public class OpenTelemetryServicesExtensionsTests
 
         Assert.False(configureBuilderCalled);
 
-        await host.StartAsync().ConfigureAwait(false);
+        await host.StartAsync();
 
         Assert.True(configureBuilderCalled);
 
-        await host.StopAsync().ConfigureAwait(false);
+        await host.StopAsync();
 
         host.Dispose();
     }
@@ -263,7 +252,7 @@ public class OpenTelemetryServicesExtensionsTests
         var builder = new HostBuilder()
             .ConfigureAppConfiguration(builder =>
             {
-                builder.AddInMemoryCollection(new Dictionary<string, string>
+                builder.AddInMemoryCollection(new Dictionary<string, string?>
                 {
                     ["TEST_KEY"] = "TEST_KEY_VALUE",
                 });
@@ -281,7 +270,7 @@ public class OpenTelemetryServicesExtensionsTests
 
                                 var configuration = sp.GetRequiredService<IConfiguration>();
 
-                                var testKeyValue = configuration.GetValue<string>("TEST_KEY", null);
+                                var testKeyValue = configuration.GetValue<string?>("TEST_KEY", null);
 
                                 Assert.Equal("TEST_KEY_VALUE", testKeyValue);
                             });
@@ -293,11 +282,11 @@ public class OpenTelemetryServicesExtensionsTests
 
         Assert.False(configureBuilderCalled);
 
-        await host.StartAsync().ConfigureAwait(false);
+        await host.StartAsync();
 
         Assert.True(configureBuilderCalled);
 
-        await host.StopAsync().ConfigureAwait(false);
+        await host.StopAsync();
 
         host.Dispose();
     }
@@ -326,9 +315,165 @@ public class OpenTelemetryServicesExtensionsTests
         Assert.True(innerTestExecuted);
     }
 
+    [Fact]
+    public void AddOpenTelemetry_WithLogging_SingleProviderForServiceCollectionTest()
+    {
+        var services = new ServiceCollection();
+
+        services.AddOpenTelemetry().WithLogging(builder => { });
+
+        services.AddOpenTelemetry().WithLogging(builder => { });
+
+        using var serviceProvider = services.BuildServiceProvider();
+
+        Assert.NotNull(serviceProvider);
+
+        var loggerProviders = serviceProvider.GetServices<LoggerProvider>();
+
+        Assert.Single(loggerProviders);
+    }
+
+    [Fact]
+    public void AddOpenTelemetry_WithLogging_DisposalTest()
+    {
+        var services = new ServiceCollection();
+
+        bool testRun = false;
+
+        services.AddOpenTelemetry().WithLogging(builder =>
+        {
+            testRun = true;
+
+            // Note: Build can't be called directly on builder tied to external services
+            Assert.Throws<NotSupportedException>(() => builder.Build());
+        });
+
+        Assert.True(testRun);
+
+        var serviceProvider = services.BuildServiceProvider();
+
+        var provider = serviceProvider.GetRequiredService<LoggerProvider>() as LoggerProviderSdk;
+
+        Assert.NotNull(provider);
+        Assert.Null(provider.OwnedServiceProvider);
+
+        Assert.NotNull(serviceProvider);
+        Assert.NotNull(provider);
+
+        Assert.False(provider.Disposed);
+
+        serviceProvider.Dispose();
+
+        Assert.True(provider.Disposed);
+    }
+
+    [Fact]
+    public void AddOpenTelemetry_WithLogging_HostConfigurationHonoredTest()
+    {
+        bool configureBuilderCalled = false;
+
+        var builder = new HostBuilder()
+            .ConfigureAppConfiguration(builder =>
+            {
+                builder.AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["TEST_KEY"] = "TEST_KEY_VALUE",
+                });
+            })
+            .ConfigureServices(services =>
+            {
+                services.AddOpenTelemetry()
+                    .WithLogging(builder =>
+                    {
+                        if (builder is IDeferredLoggerProviderBuilder deferredLoggerProviderBuilder)
+                        {
+                            deferredLoggerProviderBuilder.Configure((sp, builder) =>
+                            {
+                                configureBuilderCalled = true;
+
+                                var configuration = sp.GetRequiredService<IConfiguration>();
+
+                                var testKeyValue = configuration.GetValue<string?>("TEST_KEY", null);
+
+                                Assert.Equal("TEST_KEY_VALUE", testKeyValue);
+                            });
+                        }
+                    });
+            });
+
+        var host = builder.Build();
+
+        Assert.True(configureBuilderCalled);
+
+        host.Dispose();
+    }
+
+    [Fact]
+    public void AddOpenTelemetry_WithLogging_NestedResolutionUsingConfigureTest()
+    {
+        bool innerTestExecuted = false;
+
+        var services = new ServiceCollection();
+
+        services.AddOpenTelemetry().WithLogging(builder =>
+        {
+            if (builder is IDeferredLoggerProviderBuilder deferredLoggerProviderBuilder)
+            {
+                deferredLoggerProviderBuilder.Configure((sp, builder) =>
+                {
+                    innerTestExecuted = true;
+                    Assert.Throws<NotSupportedException>(() => sp.GetService<LoggerProvider>());
+                });
+            }
+        });
+
+        using var serviceProvider = services.BuildServiceProvider();
+        var resolvedProvider = serviceProvider.GetRequiredService<LoggerProvider>();
+        Assert.True(innerTestExecuted);
+    }
+
+    [Fact]
+    public async Task AddOpenTelemetry_HostedServiceOrder_DoesNotMatter()
+    {
+        var exportedItems = new List<Activity>();
+
+        var builder = new HostBuilder().ConfigureServices(services =>
+        {
+            services.AddHostedService<TestHostedService>();
+            services.AddOpenTelemetry()
+                .WithTracing(builder =>
+                {
+                    builder.SetSampler(new AlwaysOnSampler());
+                    builder.AddSource(nameof(TestHostedService));
+                    builder.AddInMemoryExporter(exportedItems);
+                });
+        });
+
+        var host = builder.Build();
+        await host.StartAsync();
+        await host.StopAsync();
+        host.Dispose();
+
+        Assert.Single(exportedItems);
+    }
+
     private sealed class MySampler : Sampler
     {
         public override SamplingResult ShouldSample(in SamplingParameters samplingParameters)
             => new(SamplingDecision.RecordAndSample);
+    }
+
+    private sealed class TestHostedService : BackgroundService
+    {
+        private readonly ActivitySource activitySource = new ActivitySource(nameof(TestHostedService));
+
+        protected override Task ExecuteAsync(CancellationToken stoppingToken)
+        {
+            using (var activity = this.activitySource.StartActivity("test"))
+            {
+            }
+
+            return Task.CompletedTask;
+        }
     }
 }

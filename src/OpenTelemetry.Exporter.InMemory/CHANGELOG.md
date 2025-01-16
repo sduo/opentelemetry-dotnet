@@ -1,6 +1,108 @@
 # Changelog
 
+This file contains individual changes for the OpenTelemetry.Exporter.InMemory
+package. For highlights and announcements covering all components see: [Release
+Notes](../../RELEASENOTES.md).
+
 ## Unreleased
+
+## 1.11.0
+
+Released 2025-Jan-15
+
+## 1.11.0-rc.1
+
+Released 2024-Dec-11
+
+## 1.10.0
+
+Released 2024-Nov-12
+
+## 1.10.0-rc.1
+
+Released 2024-Nov-01
+
+## 1.10.0-beta.1
+
+Released 2024-Sep-30
+
+## 1.9.0
+
+Released 2024-Jun-14
+
+## 1.9.0-rc.1
+
+Released 2024-Jun-07
+
+* The experimental APIs previously covered by `OTEL1000`
+  (`LoggerProviderBuilder.AddInMemoryExporter` extension) are now part of the
+  public API and supported in stable builds.
+  ([#5648](https://github.com/open-telemetry/opentelemetry-dotnet/pull/5648))
+
+## 1.9.0-alpha.1
+
+Released 2024-May-20
+
+## 1.8.1
+
+Released 2024-Apr-17
+
+## 1.8.0
+
+Released 2024-Apr-02
+
+## 1.8.0-rc.1
+
+Released 2024-Mar-27
+
+## 1.8.0-beta.1
+
+Released 2024-Mar-14
+
+## 1.7.0
+
+Released 2023-Dec-08
+
+## 1.7.0-rc.1
+
+Released 2023-Nov-29
+
+## 1.7.0-alpha.1
+
+Released 2023-Oct-16
+
+## 1.6.0
+
+Released 2023-Sep-05
+
+## 1.6.0-rc.1
+
+Released 2023-Aug-21
+
+## 1.6.0-alpha.1
+
+Released 2023-Jul-12
+
+* **Experimental (pre-release builds only):** Added
+  `LoggerProviderBuilder.AddInMemoryExporter` registration extension.
+  ([#4584](https://github.com/open-telemetry/opentelemetry-dotnet/pull/4584),
+  [#4735](https://github.com/open-telemetry/opentelemetry-dotnet/pull/4735))
+
+## 1.5.1
+
+Released 2023-Jun-26
+
+## 1.5.0
+
+Released 2023-Jun-05
+
+## 1.5.0-rc.1
+
+Released 2023-May-25
+
+## 1.5.0-alpha.2
+
+Released 2023-Mar-31
 
 * Fixed issue where the `MetricSnapshot` of a histogram did not capture the min
   and max values.

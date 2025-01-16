@@ -29,13 +29,13 @@ Targeting `Microsoft.Extensions.DependencyInjection.IServiceCollection`:
   [IServiceCollection](https://learn.microsoft.com/dotnet/api/microsoft.extensions.dependencyinjection.iservicecollection)
   and then returns an `OpenTelemetryBuilder` class.
 
-  > **Note**
+  > [!NOTE]
   > `AddOpenTelemetry` should be called by application host code only. Library
   authors see: [Registration extension method guidance for library
   authors](../../docs/trace/extending-the-sdk/README.md#registration-extension-method-guidance-for-library-authors).
   <!-- This comment is to make sure the two notes above and below are not merged
   -->
-  > **Note**
+  > [!NOTE]
   > Multiple calls to `AddOpenTelemetry` will **NOT** result in multiple
   providers. Only a single `TracerProvider` and/or `MeterProvider` will be
   created in the target `IServiceCollection`. To establish multiple providers
@@ -83,6 +83,41 @@ app.Run();
 A fully functional example can be found
 [here](https://github.com/open-telemetry/opentelemetry-dotnet/tree/main/examples/AspNetCore).
 
+### Resources
+
+To dynamically add resources at startup from the dependency injection you can
+provide an `IResourceDetector`.
+To make use of it add it to the dependency injection and then you can use the
+`IServiceProvider` to add it to OpenTelemetry:
+
+```csharp
+public class MyResourceDetector : IResourceDetector
+{
+    private readonly IWebHostEnvironment webHostEnvironment;
+
+    public MyResourceDetector(IWebHostEnvironment webHostEnvironment)
+    {
+        this.webHostEnvironment = webHostEnvironment;
+    }
+
+    public Resource Detect()
+    {
+        return ResourceBuilder.CreateEmpty()
+            .AddService(serviceName: this.webHostEnvironment.ApplicationName)
+            .AddAttributes(new Dictionary<string, object> { ["host.environment"] = this.webHostEnvironment.EnvironmentName })
+            .Build();
+    }
+}
+
+services.AddSingleton<MyResourceDetector>();
+
+services.AddOpenTelemetry()
+    .ConfigureResource(builder =>
+        builder.AddDetector(sp => sp.GetRequiredService<MyResourceDetector>()))
+    .WithTracing(builder => builder.AddConsoleExporter())
+    .WithMetrics(builder => builder.AddConsoleExporter());
+```
+
 ## Migrating from pre-release versions of OpenTelemetry.Extensions.Hosting
 
 Pre-release versions (all versions prior to 1.4.0) of
@@ -105,6 +140,10 @@ code to the new `AddOpenTelemetry` method documented above. Refer the
 and
 [new](https://github.com/open-telemetry/opentelemetry-dotnet/tree/main/examples/AspNetCore)
 versions of the example application to assist you in your migration.
+
+## Hosted Service Ordering and Telemetry Capture
+
+TBD
 
 ## References
 

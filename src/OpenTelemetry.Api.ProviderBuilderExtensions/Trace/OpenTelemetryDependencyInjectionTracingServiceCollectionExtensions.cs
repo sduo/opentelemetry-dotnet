@@ -1,18 +1,5 @@
-// <copyright file="OpenTelemetryDependencyInjectionTracingServiceCollectionExtensions.cs" company="OpenTelemetry Authors">
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// </copyright>
+// SPDX-License-Identifier: Apache-2.0
 
 using Microsoft.Extensions.DependencyInjection;
 using OpenTelemetry.Internal;
@@ -26,9 +13,7 @@ public static class OpenTelemetryDependencyInjectionTracingServiceCollectionExte
 {
     /// <summary>
     /// Registers an action used to configure the OpenTelemetry <see
-    /// cref="TracerProviderBuilder"/> used to create the <see
-    /// cref="TracerProvider"/> for the <see cref="IServiceCollection"/> being
-    /// configured.
+    /// cref="TracerProviderBuilder"/>.
     /// </summary>
     /// <remarks>
     /// Notes:
@@ -36,14 +21,56 @@ public static class OpenTelemetryDependencyInjectionTracingServiceCollectionExte
     /// <item>This is safe to be called multiple times and by library authors.
     /// Each registered configuration action will be applied
     /// sequentially.</item>
-    /// <item>A <see cref="TracerProvider"/> will not be created automatically
-    /// using this method. To begin collecting metrics use the
+    /// <item>A <see cref="TracerProvider"/> will NOT be created automatically
+    /// using this method. To begin collecting traces use the
     /// <c>IServiceCollection.AddOpenTelemetry</c> extension in the
     /// <c>OpenTelemetry.Extensions.Hosting</c> package.</item>
     /// </list>
     /// </remarks>
-    /// <param name="services">The <see cref="IServiceCollection" /> to add
-    /// services to.</param>
+    /// <param name="services"><see cref="IServiceCollection" />.</param>
+    /// <param name="configure">Callback action to configure the <see
+    /// cref="TracerProviderBuilder"/>.</param>
+    /// <returns>The <see cref="IServiceCollection"/> so that additional calls
+    /// can be chained.</returns>
+    public static IServiceCollection ConfigureOpenTelemetryTracerProvider(
+        this IServiceCollection services,
+        Action<TracerProviderBuilder> configure)
+    {
+        Guard.ThrowIfNull(services);
+        Guard.ThrowIfNull(configure);
+
+        configure(new TracerProviderServiceCollectionBuilder(services));
+
+        return services;
+    }
+
+    /// <summary>
+    /// Registers an action used to configure the OpenTelemetry <see
+    /// cref="TracerProviderBuilder"/> once the <see cref="IServiceProvider"/>
+    /// is available.
+    /// </summary>
+    /// <remarks>
+    /// Notes:
+    /// <list type="bullet">
+    /// <item>This is safe to be called multiple times and by library authors.
+    /// Each registered configuration action will be applied
+    /// sequentially.</item>
+    /// <item>A <see cref="TracerProvider"/> will NOT be created automatically
+    /// using this method. To begin collecting traces use the
+    /// <c>IServiceCollection.AddOpenTelemetry</c> extension in the
+    /// <c>OpenTelemetry.Extensions.Hosting</c> package.</item>
+    /// <item>The supplied configuration delegate is called once the <see
+    /// cref="IServiceProvider"/> is available. Services may NOT be added to a
+    /// <see cref="TracerProviderBuilder"/> once the <see
+    /// cref="IServiceProvider"/> has been created. Many helper extensions
+    /// register services and may throw if invoked inside the configuration
+    /// delegate. If you don't need access to the <see cref="IServiceProvider"/>
+    /// call <see cref="ConfigureOpenTelemetryTracerProvider(IServiceCollection,
+    /// Action{TracerProviderBuilder})"/> instead which is safe to be used with
+    /// helper extensions.</item>
+    /// </list>
+    /// </remarks>
+    /// <param name="services"><see cref="IServiceCollection" />.</param>
     /// <param name="configure">Callback action to configure the <see
     /// cref="TracerProviderBuilder"/>.</param>
     /// <returns>The <see cref="IServiceCollection"/> so that additional calls
@@ -52,18 +79,13 @@ public static class OpenTelemetryDependencyInjectionTracingServiceCollectionExte
         this IServiceCollection services,
         Action<IServiceProvider, TracerProviderBuilder> configure)
     {
-        RegisterBuildAction(services, configure);
-
-        return services;
-    }
-
-    private static void RegisterBuildAction(IServiceCollection services, Action<IServiceProvider, TracerProviderBuilder> configure)
-    {
         Guard.ThrowIfNull(services);
         Guard.ThrowIfNull(configure);
 
         services.AddSingleton<IConfigureTracerProviderBuilder>(
             new ConfigureTracerProviderBuilderCallbackWrapper(configure));
+
+        return services;
     }
 
     private sealed class ConfigureTracerProviderBuilderCallbackWrapper : IConfigureTracerProviderBuilder

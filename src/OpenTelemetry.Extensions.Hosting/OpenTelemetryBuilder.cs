@@ -1,21 +1,11 @@
-// <copyright file="OpenTelemetryBuilder.cs" company="OpenTelemetry Authors">
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// </copyright>
+// SPDX-License-Identifier: Apache-2.0
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.Metrics;
+using Microsoft.Extensions.Logging;
 using OpenTelemetry.Internal;
+using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -26,7 +16,7 @@ namespace OpenTelemetry;
 /// Contains methods for configuring the OpenTelemetry SDK inside an <see
 /// cref="IServiceCollection"/>.
 /// </summary>
-public sealed class OpenTelemetryBuilder
+public sealed class OpenTelemetryBuilder : IOpenTelemetryBuilder
 {
     internal OpenTelemetryBuilder(IServiceCollection services)
     {
@@ -37,14 +27,12 @@ public sealed class OpenTelemetryBuilder
         this.Services = services;
     }
 
-    /// <summary>
-    /// Gets the <see cref="IServiceCollection"/> behind the builder.
-    /// </summary>
+    /// <inheritdoc />
     public IServiceCollection Services { get; }
 
     /// <summary>
     /// Registers an action to configure the <see cref="ResourceBuilder"/>s used
-    /// by tracing and metrics.
+    /// by tracing, metrics, and logging.
     /// </summary>
     /// <remarks>
     /// Note: This is safe to be called multiple times and by library authors.
@@ -57,14 +45,7 @@ public sealed class OpenTelemetryBuilder
     public OpenTelemetryBuilder ConfigureResource(
         Action<ResourceBuilder> configure)
     {
-        Guard.ThrowIfNull(configure);
-
-        this.Services.ConfigureOpenTelemetryMeterProvider(
-            (sp, builder) => builder.ConfigureResource(configure));
-
-        this.Services.ConfigureOpenTelemetryTracerProvider(
-            (sp, builder) => builder.ConfigureResource(configure));
-
+        OpenTelemetryBuilderSdkExtensions.ConfigureResource(this, configure);
         return this;
     }
 
@@ -72,9 +53,15 @@ public sealed class OpenTelemetryBuilder
     /// Adds metric services into the builder.
     /// </summary>
     /// <remarks>
-    /// Note: This is safe to be called multiple times and by library authors.
+    /// Notes:
+    /// <list type="bullet">
+    /// <item>This is safe to be called multiple times and by library authors.
     /// Only a single <see cref="MeterProvider"/> will be created for a given
-    /// <see cref="IServiceCollection"/>.
+    /// <see cref="IServiceCollection"/>.</item>
+    /// <item>This method automatically registers an <see
+    /// cref="IMetricsListener"/> named 'OpenTelemetry' into the <see
+    /// cref="IServiceCollection"/>.</item>
+    /// </list>
     /// </remarks>
     /// <returns>The supplied <see cref="OpenTelemetryBuilder"/> for chaining
     /// calls.</returns>
@@ -91,12 +78,7 @@ public sealed class OpenTelemetryBuilder
     /// calls.</returns>
     public OpenTelemetryBuilder WithMetrics(Action<MeterProviderBuilder> configure)
     {
-        Guard.ThrowIfNull(configure);
-
-        var builder = new MeterProviderBuilderBase(this.Services);
-
-        configure(builder);
-
+        OpenTelemetryBuilderSdkExtensions.WithMetrics(this, configure);
         return this;
     }
 
@@ -123,11 +105,62 @@ public sealed class OpenTelemetryBuilder
     /// calls.</returns>
     public OpenTelemetryBuilder WithTracing(Action<TracerProviderBuilder> configure)
     {
+        OpenTelemetryBuilderSdkExtensions.WithTracing(this, configure);
+        return this;
+    }
+
+    /// <summary>
+    /// Adds logging services into the builder.
+    /// </summary>
+    /// <remarks>
+    /// Notes:
+    /// <list type="bullet">
+    /// <item>This is safe to be called multiple times and by library authors.
+    /// Only a single <see cref="LoggerProvider"/> will be created for a given
+    /// <see cref="IServiceCollection"/>.</item>
+    /// <item>This method automatically registers an <see
+    /// cref="ILoggerProvider"/> named 'OpenTelemetry' into the <see
+    /// cref="IServiceCollection"/>.</item>
+    /// </list>
+    /// </remarks>
+    /// <returns>The supplied <see cref="OpenTelemetryBuilder"/> for chaining
+    /// calls.</returns>
+    public OpenTelemetryBuilder WithLogging()
+        => this.WithLogging(configureBuilder: null, configureOptions: null);
+
+    /// <summary>
+    /// Adds logging services into the builder.
+    /// </summary>
+    /// <remarks><inheritdoc cref="WithLogging()" path="/remarks"/></remarks>
+    /// <param name="configure"><see cref="LoggerProviderBuilder"/>
+    /// configuration callback.</param>
+    /// <returns>The supplied <see cref="OpenTelemetryBuilder"/> for chaining
+    /// calls.</returns>
+    public OpenTelemetryBuilder WithLogging(Action<LoggerProviderBuilder> configure)
+    {
         Guard.ThrowIfNull(configure);
 
-        var builder = new TracerProviderBuilderBase(this.Services);
+        return this.WithLogging(configureBuilder: configure, configureOptions: null);
+    }
 
-        configure(builder);
+    /// <summary>
+    /// Adds logging services into the builder.
+    /// </summary>
+    /// <remarks><inheritdoc cref="WithLogging()" path="/remarks"/></remarks>
+    /// <param name="configureBuilder">Optional <see
+    /// cref="LoggerProviderBuilder"/> configuration callback.</param>
+    /// <param name="configureOptions">Optional <see
+    /// cref="OpenTelemetryLoggerOptions"/> configuration callback. <see
+    /// cref="OpenTelemetryLoggerOptions"/> are used by the <see
+    /// cref="ILoggerProvider"/> named 'OpenTelemetry' automatically registered
+    /// by this method.</param>
+    /// <returns>The supplied <see cref="OpenTelemetryBuilder"/> for chaining
+    /// calls.</returns>
+    public OpenTelemetryBuilder WithLogging(
+        Action<LoggerProviderBuilder>? configureBuilder,
+        Action<OpenTelemetryLoggerOptions>? configureOptions)
+    {
+        OpenTelemetryBuilderSdkExtensions.WithLogging(this, configureBuilder, configureOptions);
 
         return this;
     }

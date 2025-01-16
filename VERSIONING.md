@@ -28,7 +28,7 @@ versions [1.1.0, 2.0.0).
 
 Core components refer to the set of components which are required as per the
 spec. This includes API, SDK, and exporters which are required by the
-specification. These exporters are OTLP, Jaeger, Zipkin, Console and InMemory.
+specification. These exporters are OTLP, Zipkin, Console and InMemory.
 
 The core components are always versioned and released together. For example, if
 Zipkin exporter has a bug fix and is released as 1.0.1, then all other core
@@ -56,9 +56,9 @@ without corresponding changes here will result in build breaks - this helps
 catch any unintended changes to public API from being shipped accidentally. This
 also helps reviewers quickly understand if a given PR is proposing public API
 changes. For example,
-[this](https://github.com/open-telemetry/opentelemetry-dotnet/tree/master/src/OpenTelemetry.Instrumentation.AspNetCore/.publicApi)
+[this](https://github.com/open-telemetry/opentelemetry-dotnet/tree/master/src/OpenTelemetry.Exporter.OpenTelemetryProtocol/.publicApi)
 shows the public APIs, per target framework for the
-`OpenTelemetry.Instrumentation.AspNetCore` package.
+`OpenTelemetry.Exporter.OpenTelemetryProtocol` package.
 
 APIs which are released as part of stable packages will be listed in the
 "Shipped.txt" file, and those APIs which are released as part of

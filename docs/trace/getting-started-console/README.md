@@ -1,4 +1,4 @@
-# Getting Started with OpenTelemetry .NET in 5 Minutes - Console Application
+# Getting Started with OpenTelemetry .NET Traces in 5 Minutes - Console Application
 
 First, download and install the [.NET
 SDK](https://dotnet.microsoft.com/download) on your computer.
@@ -85,7 +85,7 @@ is configured to subscribe to the activities from the source
 `ConsoleExporter` simply displays it on the console.
 
 ```csharp
-using var tracerProvider = Sdk.CreateTracerProviderBuilder()
+var tracerProvider = Sdk.CreateTracerProviderBuilder()
     .AddSource("MyCompany.MyProduct.MyLibrary")
     .AddConsoleExporter()
     .Build();

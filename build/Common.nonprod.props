@@ -7,6 +7,10 @@
     <CodeAnalysisRuleSet>$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildProjectDirectory), 'OpenTelemetry.sln'))\build\OpenTelemetry.test.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <DefaultTargetFrameworkForExampleApps>net9.0</DefaultTargetFrameworkForExampleApps>
+  </PropertyGroup>
+
   <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('.Tests'))">
     <IsTestProject>true</IsTestProject>
   </PropertyGroup>
@@ -15,8 +19,6 @@
     <Content Include="$([MSBuild]::GetDirectoryNameOfFileAbove($(MSBuildProjectDirectory), 'OpenTelemetry.sln'))\build\xunit.runner.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <!--Temp workaround to allow using daily dotnet 6 builds-->
-    <!--<PackageReference Include="System.Runtime.CompilerServices.Unsafe" PrivateAssets="All" NoWarn="NU1605" Version="6.0.0-preview.4.21253.7" />-->
   </ItemGroup>
 
   <PropertyGroup>
@@ -25,32 +27,41 @@
     <ProduceReferenceAssemblyInOutDir>true</ProduceReferenceAssemblyInOutDir>
   </PropertyGroup>
 
-  <PropertyGroup Label="Package versions used by test and example projects">
-    <!--
-      Please sort alphabetically.
-      Refer to https://docs.microsoft.com/nuget/concepts/package-versioning for semver syntax.
-    -->
-    <BenchmarkDotNetPkgVer>[0.13.3,0.14)</BenchmarkDotNetPkgVer>
-    <CommandLineParserPkgVer>[2.9.1,3.0)</CommandLineParserPkgVer>
-    <DotNetXUnitCliVer>[2.3.1,3.0)</DotNetXUnitCliVer>
-    <GoogleProtobufPkgVer>[3.22.0,4.0)</GoogleProtobufPkgVer>
-    <GrpcAspNetCorePkgVer>[2.50.0,3.0)</GrpcAspNetCorePkgVer>
-    <GrpcAspNetCoreServerPkgVer>[2.48.0, 3.0)</GrpcAspNetCoreServerPkgVer>
-    <GrpcToolsPkgVer>[2.48.0,3.0)</GrpcToolsPkgVer>
-    <MicrosoftExtensionsHostingPkgVer>[3.1.6,5.0)</MicrosoftExtensionsHostingPkgVer>
-    <MicrosoftExtensionsLoggingPkgVer>[6.0.0,)</MicrosoftExtensionsLoggingPkgVer>
-    <MicrosoftExtensionsLoggingAbstractionsPkgVer>[6.0.0,)</MicrosoftExtensionsLoggingAbstractionsPkgVer>
-    <MicrosoftNETTestSdkPkgVer>[17.4.1]</MicrosoftNETTestSdkPkgVer>
-    <MoqPkgVer>[4.18.3,5.0)</MoqPkgVer>
-    <RabbitMQClientPkgVer>[6.4.0,7.0)</RabbitMQClientPkgVer>
-    <RuntimeInstrumentationPkgVer>[1.0.0,2.0)</RuntimeInstrumentationPkgVer>
-    <SwashbuckleAspNetCorePkgVer>[6.4.0]</SwashbuckleAspNetCorePkgVer>
-    <SystemTextJsonPkgVer>6.0.5</SystemTextJsonPkgVer>
-    <XUnitRunnerVisualStudioPkgVer>[2.4.5,3.0)</XUnitRunnerVisualStudioPkgVer>
-    <XUnitPkgVer>[2.4.2,3.0)</XUnitPkgVer>
-  </PropertyGroup>
-
   <ItemGroup>
     <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
   </ItemGroup>
+
+  <Target Name="SkipVSTestForInvalidTargetFramework" BeforeTargets="VSTest" Condition="'$(IsTestProject)' == 'true'">
+    <!-- Note: When running dotnet test from CLI with the framework parameter
+    errors will be generated for projects which do not implement the requested
+    target. In order to enable running tests for a given framework across a
+    solution/project with mixed targets (eg: dotnet test OpenTelemetry.sln -f
+    net462) we convert this into a skip message only. -->
+    <PropertyGroup Condition="$(TargetFrameworks.Contains($(TargetFramework))) != 'true'">
+      <_SkipTests>true</_SkipTests>
+      <IsTestProject>false</IsTestProject>
+    </PropertyGroup>
+
+    <Message Importance="high" Text="Skipping test execution for '$(TargetPath)' because it does not contain the '$(TargetFramework)' target." Condition="'$(_SkipTests)' == 'true'" />
+  </Target>
+
+  <Target Name="ResolveExposedExperimentalFeatures" BeforeTargets="CoreCompile">
+    <!-- Note: What this does is look for $(ProjectReferenceName).BuildFlags.txt
+        files for all the dependencies of the project being compiled. If
+        ExposeExperimentalFeatures=true is found in those files we set compiler
+        constants for each project where experimental features were exposed.
+        Example:
+        OPENTELEMETRY_EXPORTER_INMEMORY_EXPERIMENTAL_FEATURES_EXPOSED;OPENTELEMETRY_EXPERIMENTAL_FEATURES_EXPOSED;OPENTELEMETRY_API_EXPERIMENTAL_FEATURES_EXPOSED;OPENTELEMETRY_API_PROVIDERBUILDEREXTENSIONS_EXPERIMENTAL_FEATURES_EXPOSED
+        -->
+    <ItemGroup>
+      <DependenciesWithExposedExperimentalFeatures
+        Include="@(_ResolvedProjectReferencePaths->'%(Filename)')"
+        Condition="$([System.IO.File]::Exists('%(RootDir)%(Directory)%(Filename).BuildFlags.txt')) AND $([System.IO.File]::ReadAllText('%(RootDir)%(Directory)%(Filename).BuildFlags.txt').Contains('ExposeExperimentalFeatures=true'))" />
+      <CompilerConstantsForDependenciesWithExposedExperimentalFeatures Include="@(DependenciesWithExposedExperimentalFeatures->'$([System.String]::Copy('%(DependenciesWithExposedExperimentalFeatures.Identity)').ToUpper().Replace('.', '_'))_EXPERIMENTAL_FEATURES_EXPOSED')" />
+    </ItemGroup>
+
+    <PropertyGroup Condition="'@(CompilerConstantsForDependenciesWithExposedExperimentalFeatures)' != ''">
+      <DefineConstants>$(DefineConstants);@(CompilerConstantsForDependenciesWithExposedExperimentalFeatures)</DefineConstants>
+    </PropertyGroup>
+  </Target>
 </Project>

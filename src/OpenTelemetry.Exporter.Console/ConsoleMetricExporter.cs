@@ -1,110 +1,70 @@
-// <copyright file="ConsoleMetricExporter.cs" company="OpenTelemetry Authors">
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// </copyright>
+// SPDX-License-Identifier: Apache-2.0
 
 using System.Globalization;
 using System.Text;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 
-namespace OpenTelemetry.Exporter
+namespace OpenTelemetry.Exporter;
+
+public class ConsoleMetricExporter : ConsoleExporter<Metric>
 {
-    public class ConsoleMetricExporter : ConsoleExporter<Metric>
+    public ConsoleMetricExporter(ConsoleExporterOptions options)
+        : base(options)
     {
-        private Resource resource;
+    }
 
-        public ConsoleMetricExporter(ConsoleExporterOptions options)
-            : base(options)
+    public override ExportResult Export(in Batch<Metric> batch)
+    {
+        foreach (var metric in batch)
         {
-        }
-
-        public override ExportResult Export(in Batch<Metric> batch)
-        {
-            if (this.resource == null)
+            var msg = new StringBuilder($"\n");
+            msg.Append($"Metric Name: {metric.Name}");
+            if (metric.Description != string.Empty)
             {
-                this.resource = this.ParentProvider.GetResource();
-                if (this.resource != Resource.Empty)
-                {
-                    this.WriteLine("Resource associated with Metric:");
-                    foreach (var resourceAttribute in this.resource.Attributes)
-                    {
-                        if (ConsoleTagTransformer.Instance.TryTransformTag(resourceAttribute, out var result))
-                        {
-                            this.WriteLine($"    {result}");
-                        }
-                    }
-                }
+                msg.Append($", Description: {metric.Description}");
             }
 
-            foreach (var metric in batch)
+            if (metric.Unit != string.Empty)
             {
-                var msg = new StringBuilder($"\nExport ");
-                msg.Append(metric.Name);
-                if (metric.Description != string.Empty)
-                {
-                    msg.Append(", ");
-                    msg.Append(metric.Description);
-                }
+                msg.Append($", Unit: {metric.Unit}");
+            }
 
-                if (metric.Unit != string.Empty)
-                {
-                    msg.Append($", Unit: {metric.Unit}");
-                }
+            this.WriteLine(msg.ToString());
 
-                if (!string.IsNullOrEmpty(metric.MeterName))
+            foreach (ref readonly var metricPoint in metric.GetMetricPoints())
+            {
+                string valueDisplay = string.Empty;
+                StringBuilder tagsBuilder = new StringBuilder();
+                foreach (var tag in metricPoint.Tags)
                 {
-                    msg.Append($", Meter: {metric.MeterName}");
-
-                    if (!string.IsNullOrEmpty(metric.MeterVersion))
+                    if (this.TagWriter.TryTransformTag(tag, out var result))
                     {
-                        msg.Append($"/{metric.MeterVersion}");
+                        tagsBuilder.Append($"{result.Key}: {result.Value}");
+                        tagsBuilder.Append(' ');
                     }
                 }
 
-                this.WriteLine(msg.ToString());
+                var tags = tagsBuilder.ToString().TrimEnd();
 
-                foreach (ref readonly var metricPoint in metric.GetMetricPoints())
+                var metricType = metric.MetricType;
+
+                if (metricType == MetricType.Histogram || metricType == MetricType.ExponentialHistogram)
                 {
-                    string valueDisplay = string.Empty;
-                    StringBuilder tagsBuilder = new StringBuilder();
-                    foreach (var tag in metricPoint.Tags)
+                    var bucketsBuilder = new StringBuilder();
+                    var sum = metricPoint.GetHistogramSum();
+                    var count = metricPoint.GetHistogramCount();
+                    bucketsBuilder.Append($"Sum: {sum} Count: {count} ");
+                    if (metricPoint.TryGetHistogramMinMaxValues(out double min, out double max))
                     {
-                        if (ConsoleTagTransformer.Instance.TryTransformTag(tag, out var result))
-                        {
-                            tagsBuilder.Append(result);
-                            tagsBuilder.Append(' ');
-                        }
+                        bucketsBuilder.Append($"Min: {min} Max: {max} ");
                     }
 
-                    var tags = tagsBuilder.ToString().TrimEnd();
+                    bucketsBuilder.AppendLine();
 
-                    var metricType = metric.MetricType;
-
-                    if (metricType.IsHistogram())
+                    if (metricType == MetricType.Histogram)
                     {
-                        var bucketsBuilder = new StringBuilder();
-                        var sum = metricPoint.GetHistogramSum();
-                        var count = metricPoint.GetHistogramCount();
-                        bucketsBuilder.Append($"Sum: {sum} Count: {count} ");
-                        if (metricPoint.TryGetHistogramMinMaxValues(out double min, out double max))
-                        {
-                            bucketsBuilder.Append($"Min: {min} Max: {max} ");
-                        }
-
-                        bucketsBuilder.AppendLine();
-
                         bool isFirstIteration = true;
                         double previousExplicitBound = default;
                         foreach (var histogramMeasurement in metricPoint.GetHistogramBuckets())
@@ -141,92 +101,156 @@ namespace OpenTelemetry.Exporter
 
                             bucketsBuilder.AppendLine();
                         }
+                    }
+                    else
+                    {
+                        var exponentialHistogramData = metricPoint.GetExponentialHistogramData();
+                        var scale = exponentialHistogramData.Scale;
 
-                        valueDisplay = bucketsBuilder.ToString();
-                    }
-                    else if (metricType.IsDouble())
-                    {
-                        if (metricType.IsSum())
+                        if (exponentialHistogramData.ZeroCount != 0)
                         {
-                            valueDisplay = metricPoint.GetSumDouble().ToString(CultureInfo.InvariantCulture);
+                            bucketsBuilder.AppendLine($"Zero Bucket:{exponentialHistogramData.ZeroCount}");
                         }
-                        else
+
+                        var offset = exponentialHistogramData.PositiveBuckets.Offset;
+                        foreach (var bucketCount in exponentialHistogramData.PositiveBuckets)
                         {
-                            valueDisplay = metricPoint.GetGaugeLastValueDouble().ToString(CultureInfo.InvariantCulture);
-                        }
-                    }
-                    else if (metricType.IsLong())
-                    {
-                        if (metricType.IsSum())
-                        {
-                            valueDisplay = metricPoint.GetSumLong().ToString(CultureInfo.InvariantCulture);
-                        }
-                        else
-                        {
-                            valueDisplay = metricPoint.GetGaugeLastValueLong().ToString(CultureInfo.InvariantCulture);
+                            var lowerBound = Base2ExponentialBucketHistogramHelper.CalculateLowerBoundary(offset, scale).ToString(CultureInfo.InvariantCulture);
+                            var upperBound = Base2ExponentialBucketHistogramHelper.CalculateLowerBoundary(++offset, scale).ToString(CultureInfo.InvariantCulture);
+                            bucketsBuilder.AppendLine($"({lowerBound}, {upperBound}]:{bucketCount}");
                         }
                     }
 
-                    var exemplarString = new StringBuilder();
-                    foreach (var exemplar in metricPoint.GetExemplars())
+                    valueDisplay = bucketsBuilder.ToString();
+                }
+                else if (metricType.IsDouble())
+                {
+                    if (metricType.IsSum())
                     {
-                        if (exemplar.Timestamp != default)
+                        valueDisplay = metricPoint.GetSumDouble().ToString(CultureInfo.InvariantCulture);
+                    }
+                    else
+                    {
+                        valueDisplay = metricPoint.GetGaugeLastValueDouble().ToString(CultureInfo.InvariantCulture);
+                    }
+                }
+                else if (metricType.IsLong())
+                {
+                    if (metricType.IsSum())
+                    {
+                        valueDisplay = metricPoint.GetSumLong().ToString(CultureInfo.InvariantCulture);
+                    }
+                    else
+                    {
+                        valueDisplay = metricPoint.GetGaugeLastValueLong().ToString(CultureInfo.InvariantCulture);
+                    }
+                }
+
+                var exemplarString = new StringBuilder();
+                if (metricPoint.TryGetExemplars(out var exemplars))
+                {
+                    foreach (ref readonly var exemplar in exemplars)
+                    {
+                        exemplarString.Append("Timestamp: ");
+                        exemplarString.Append(exemplar.Timestamp.ToString("yyyy-MM-ddTHH:mm:ss.fffffffZ", CultureInfo.InvariantCulture));
+                        if (metricType.IsDouble())
                         {
-                            exemplarString.Append("Value: ");
+                            exemplarString.Append(" Value: ");
                             exemplarString.Append(exemplar.DoubleValue);
-                            exemplarString.Append(" Timestamp: ");
-                            exemplarString.Append(exemplar.Timestamp.ToString("yyyy-MM-ddTHH:mm:ss.fffffffZ", CultureInfo.InvariantCulture));
+                        }
+                        else if (metricType.IsLong())
+                        {
+                            exemplarString.Append(" Value: ");
+                            exemplarString.Append(exemplar.LongValue);
+                        }
+
+                        if (exemplar.TraceId != default)
+                        {
                             exemplarString.Append(" TraceId: ");
-                            exemplarString.Append(exemplar.TraceId);
+                            exemplarString.Append(exemplar.TraceId.ToHexString());
                             exemplarString.Append(" SpanId: ");
-                            exemplarString.Append(exemplar.SpanId);
+                            exemplarString.Append(exemplar.SpanId.ToHexString());
+                        }
 
-                            if (exemplar.FilteredTags != null && exemplar.FilteredTags.Count > 0)
+                        bool appendedTagString = false;
+                        foreach (var tag in exemplar.FilteredTags)
+                        {
+                            if (this.TagWriter.TryTransformTag(tag, out var result))
                             {
-                                exemplarString.Append(" Filtered Tags : ");
-
-                                foreach (var tag in exemplar.FilteredTags)
+                                if (!appendedTagString)
                                 {
-                                    if (ConsoleTagTransformer.Instance.TryTransformTag(tag, out var result))
-                                    {
-                                        exemplarString.Append(result);
-                                        exemplarString.Append(' ');
-                                    }
+                                    exemplarString.Append(" Filtered Tags: ");
+                                    appendedTagString = true;
                                 }
-                            }
 
-                            exemplarString.AppendLine();
+                                exemplarString.Append($"{result.Key}: {result.Value}");
+                                exemplarString.Append(' ');
+                            }
+                        }
+
+                        exemplarString.AppendLine();
+                    }
+                }
+
+                msg = new StringBuilder();
+                msg.Append('(');
+                msg.Append(metricPoint.StartTime.ToString("yyyy-MM-ddTHH:mm:ss.fffffffZ", CultureInfo.InvariantCulture));
+                msg.Append(", ");
+                msg.Append(metricPoint.EndTime.ToString("yyyy-MM-ddTHH:mm:ss.fffffffZ", CultureInfo.InvariantCulture));
+                msg.Append("] ");
+                msg.Append(tags);
+                if (tags != string.Empty)
+                {
+                    msg.Append(' ');
+                }
+
+                msg.Append(metric.MetricType);
+                msg.AppendLine();
+                msg.Append($"Value: {valueDisplay}");
+
+                if (exemplarString.Length > 0)
+                {
+                    msg.AppendLine();
+                    msg.AppendLine("Exemplars");
+                    msg.Append(exemplarString.ToString());
+                }
+
+                this.WriteLine(msg.ToString());
+
+                this.WriteLine("Instrumentation scope (Meter):");
+                this.WriteLine($"\tName: {metric.MeterName}");
+                if (!string.IsNullOrEmpty(metric.MeterVersion))
+                {
+                    this.WriteLine($"\tVersion: {metric.MeterVersion}");
+                }
+
+                if (metric.MeterTags?.Any() == true)
+                {
+                    this.WriteLine("\tTags:");
+                    foreach (var meterTag in metric.MeterTags)
+                    {
+                        if (this.TagWriter.TryTransformTag(meterTag, out var result))
+                        {
+                            this.WriteLine($"\t\t{result.Key}: {result.Value}");
                         }
                     }
+                }
 
-                    msg = new StringBuilder();
-                    msg.Append('(');
-                    msg.Append(metricPoint.StartTime.ToString("yyyy-MM-ddTHH:mm:ss.fffffffZ", CultureInfo.InvariantCulture));
-                    msg.Append(", ");
-                    msg.Append(metricPoint.EndTime.ToString("yyyy-MM-ddTHH:mm:ss.fffffffZ", CultureInfo.InvariantCulture));
-                    msg.Append("] ");
-                    msg.Append(tags);
-                    if (tags != string.Empty)
+                var resource = this.ParentProvider.GetResource();
+                if (resource != Resource.Empty)
+                {
+                    this.WriteLine("Resource associated with Metric:");
+                    foreach (var resourceAttribute in resource.Attributes)
                     {
-                        msg.Append(' ');
+                        if (this.TagWriter.TryTransformTag(resourceAttribute.Key, resourceAttribute.Value, out var result))
+                        {
+                            this.WriteLine($"\t{result.Key}: {result.Value}");
+                        }
                     }
-
-                    msg.Append(metric.MetricType);
-                    msg.AppendLine();
-                    msg.Append($"Value: {valueDisplay}");
-
-                    if (exemplarString.Length > 0)
-                    {
-                        msg.AppendLine();
-                        msg.AppendLine("Exemplars");
-                        msg.Append(exemplarString.ToString());
-                    }
-
-                    this.WriteLine(msg.ToString());
                 }
             }
-
-            return ExportResult.Success;
         }
+
+        return ExportResult.Success;
     }
 }

@@ -1,20 +1,5 @@
-// <copyright file="MeterProviderBuilderBase.cs" company="OpenTelemetry Authors">
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// </copyright>
-
-#nullable enable
+// SPDX-License-Identifier: Apache-2.0
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -28,8 +13,11 @@ namespace OpenTelemetry.Metrics;
 public class MeterProviderBuilderBase : MeterProviderBuilder, IMeterProviderBuilder
 {
     private readonly bool allowBuild;
-    private IServiceCollection? services;
+    private readonly MeterProviderServiceCollectionBuilder innerBuilder;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="MeterProviderBuilderBase"/> class.
+    /// </summary>
     public MeterProviderBuilderBase()
     {
         var services = new ServiceCollection();
@@ -40,9 +28,7 @@ public class MeterProviderBuilderBase : MeterProviderBuilder, IMeterProviderBuil
             .TryAddSingleton<MeterProvider>(
                 sp => throw new NotSupportedException("Self-contained MeterProvider cannot be accessed using the application IServiceProvider call Build instead."));
 
-        services.ConfigureOpenTelemetryMeterProvider((sp, builder) => this.services = null);
-
-        this.services = services;
+        this.innerBuilder = new MeterProviderServiceCollectionBuilder(services);
 
         this.allowBuild = true;
     }
@@ -55,9 +41,7 @@ public class MeterProviderBuilderBase : MeterProviderBuilder, IMeterProviderBuil
             .AddOpenTelemetryMeterProviderBuilderServices()
             .TryAddSingleton<MeterProvider>(sp => new MeterProviderSdk(sp, ownsServiceProvider: false));
 
-        services.ConfigureOpenTelemetryMeterProvider((sp, builder) => this.services = null);
-
-        this.services = services;
+        this.innerBuilder = new MeterProviderServiceCollectionBuilder(services);
 
         this.allowBuild = false;
     }
@@ -68,12 +52,7 @@ public class MeterProviderBuilderBase : MeterProviderBuilder, IMeterProviderBuil
     /// <inheritdoc />
     public override MeterProviderBuilder AddInstrumentation<TInstrumentation>(Func<TInstrumentation> instrumentationFactory)
     {
-        Guard.ThrowIfNull(instrumentationFactory);
-
-        this.ConfigureBuilderInternal((sp, builder) =>
-        {
-            builder.AddInstrumentation(instrumentationFactory);
-        });
+        this.innerBuilder.AddInstrumentation(instrumentationFactory);
 
         return this;
     }
@@ -81,23 +60,26 @@ public class MeterProviderBuilderBase : MeterProviderBuilder, IMeterProviderBuil
     /// <inheritdoc />
     public override MeterProviderBuilder AddMeter(params string[] names)
     {
-        Guard.ThrowIfNull(names);
-
-        this.ConfigureBuilderInternal((sp, builder) =>
-        {
-            builder.AddMeter(names);
-        });
+        this.innerBuilder.AddMeter(names);
 
         return this;
     }
 
     /// <inheritdoc />
     MeterProviderBuilder IMeterProviderBuilder.ConfigureServices(Action<IServiceCollection> configure)
-        => this.ConfigureServicesInternal(configure);
+    {
+        this.innerBuilder.ConfigureServices(configure);
+
+        return this;
+    }
 
     /// <inheritdoc />
     MeterProviderBuilder IDeferredMeterProviderBuilder.Configure(Action<IServiceProvider, MeterProviderBuilder> configure)
-        => this.ConfigureBuilderInternal(configure);
+    {
+        this.innerBuilder.ConfigureBuilder(configure);
+
+        return this;
+    }
 
     internal MeterProvider InvokeBuild()
         => this.Build();
@@ -113,14 +95,10 @@ public class MeterProviderBuilderBase : MeterProviderBuilder, IMeterProviderBuil
             throw new NotSupportedException("A MeterProviderBuilder bound to external service cannot be built directly. Access the MeterProvider using the application IServiceProvider instead.");
         }
 
-        var services = this.services;
+        var services = this.innerBuilder.Services
+            ?? throw new NotSupportedException("MeterProviderBuilder build method cannot be called multiple times.");
 
-        if (services == null)
-        {
-            throw new NotSupportedException("MeterProviderBuilder build method cannot be called multiple times.");
-        }
-
-        this.services = null;
+        this.innerBuilder.Services = null;
 
 #if DEBUG
         bool validateScopes = true;
@@ -130,35 +108,5 @@ public class MeterProviderBuilderBase : MeterProviderBuilder, IMeterProviderBuil
         var serviceProvider = services.BuildServiceProvider(validateScopes);
 
         return new MeterProviderSdk(serviceProvider, ownsServiceProvider: true);
-    }
-
-    private MeterProviderBuilder ConfigureBuilderInternal(Action<IServiceProvider, MeterProviderBuilder> configure)
-    {
-        var services = this.services;
-
-        if (services == null)
-        {
-            throw new NotSupportedException("Builder cannot be configured during MeterProvider construction.");
-        }
-
-        services.ConfigureOpenTelemetryMeterProvider(configure);
-
-        return this;
-    }
-
-    private MeterProviderBuilder ConfigureServicesInternal(Action<IServiceCollection> configure)
-    {
-        Guard.ThrowIfNull(configure);
-
-        var services = this.services;
-
-        if (services == null)
-        {
-            throw new NotSupportedException("Services cannot be configured during MeterProvider construction.");
-        }
-
-        configure(services);
-
-        return this;
     }
 }
